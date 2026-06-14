@@ -2,12 +2,31 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import google.generativeai as genai
 import os
+from pathlib import Path
 from PIL import Image
 import io
 
 app = FastAPI(title="AI Service")
 
-key = (os.getenv("GEMINI_API_KEY") or "").strip().strip("\"'")
+def read_env_value(name: str) -> str:
+    value = (os.getenv(name) or "").strip().strip("\"'")
+    if value:
+        return value
+
+    for env_path in (Path.cwd() / ".env", Path.cwd().parent / ".env", Path(__file__).resolve().parent.parent / ".env"):
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            env_name, env_value = line.split("=", 1)
+            if env_name.strip() == name:
+                return env_value.strip().strip("\"'")
+
+    return ""
+
+key = read_env_value("GEMINI_API_KEY")
 if key:
     genai.configure(api_key=key)
 
