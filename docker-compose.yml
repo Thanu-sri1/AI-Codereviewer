@@ -1,22 +1,25 @@
 services:
   auth-service:
     build: ./auth_service
-    ports:
-      - "8001:8001"
+    restart: unless-stopped
+    expose:
+      - "8001"
     volumes:
       - ./auth_service:/app
 
   execution-service:
     build: ./execution_service
-    ports:
-      - "8002:8002"
+    restart: unless-stopped
+    expose:
+      - "8002"
     volumes:
       - ./execution_service:/app
 
   ai-service:
     build: ./ai_service
-    ports:
-      - "8003:8003"
+    restart: unless-stopped
+    expose:
+      - "8003"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
@@ -24,13 +27,25 @@ services:
 
   review-service:
     build: ./review_service
-    ports:
-      - "8004:8004"
+    restart: unless-stopped
+    expose:
+      - "8004"
     volumes:
       - ./review_service:/app
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - execution-service
+      - ai-service
+      - review-service
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - EXECUTION_SERVICE_URL=http://execution-service:8002
+      - AI_SERVICE_URL=http://ai-service:8003
+      - REVIEW_SERVICE_URL=http://review-service:8004
     ports:
       - "8501:8501"
     volumes:

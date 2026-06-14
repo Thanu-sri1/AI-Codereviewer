@@ -7,18 +7,13 @@ import hashlib
 from PIL import Image
 import io
 import ast
+import os
 
 # Microservices URLs
-AUTH_SERVICE_URL = "http://auth-service:8001"
-EXECUTION_SERVICE_URL = "http://execution-service:8002"
-AI_SERVICE_URL = "http://ai-service:8003"
-REVIEW_SERVICE_URL = "http://review-service:8004"
-
-# If running locally without docker-compose, you might need localhost URLs instead:
-# AUTH_SERVICE_URL = "http://localhost:8001"
-# EXECUTION_SERVICE_URL = "http://localhost:8002"
-# AI_SERVICE_URL = "http://localhost:8003"
-# REVIEW_SERVICE_URL = "http://localhost:8004"
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
+EXECUTION_SERVICE_URL = os.getenv("EXECUTION_SERVICE_URL", "http://localhost:8002")
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://localhost:8003")
+REVIEW_SERVICE_URL = os.getenv("REVIEW_SERVICE_URL", "http://localhost:8004")
 
 def is_valid_python_code(text):
     try:
