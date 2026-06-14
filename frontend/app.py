@@ -16,50 +16,6 @@ EXECUTION_SERVICE_URL = os.getenv("EXECUTION_SERVICE_URL", "http://localhost:800
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://localhost:8003")
 REVIEW_SERVICE_URL = os.getenv("REVIEW_SERVICE_URL", "http://localhost:8004")
 
-MICROSERVICES = [
-    {
-        "name": "Auth Service",
-        "base_url": AUTH_SERVICE_URL,
-        "purpose": "Handles user registration and login.",
-        "endpoints": [
-            ("GET", "/health", "Service health check"),
-            ("POST", "/register", "Create a new user"),
-            ("POST", "/login", "Authenticate an existing user"),
-        ],
-    },
-    {
-        "name": "Execution Service",
-        "base_url": EXECUTION_SERVICE_URL,
-        "purpose": "Runs submitted Python code and returns output.",
-        "endpoints": [
-            ("GET", "/health", "Service health check"),
-            ("POST", "/run", "Execute Python code"),
-        ],
-    },
-    {
-        "name": "AI Service",
-        "base_url": AI_SERVICE_URL,
-        "purpose": "Uses Gemini for code review and image-to-code extraction.",
-        "endpoints": [
-            ("GET", "/health", "Service health check"),
-            ("POST", "/review", "Review source code"),
-            ("POST", "/extract", "Extract code from an uploaded image"),
-        ],
-    },
-    {
-        "name": "Review Service",
-        "base_url": REVIEW_SERVICE_URL,
-        "purpose": "Stores and retrieves user review history.",
-        "endpoints": [
-            ("GET", "/health", "Service health check"),
-            ("GET", "/reviews/{username}", "Get saved reviews for a user"),
-            ("POST", "/reviews/{username}", "Save or update a review"),
-            ("DELETE", "/reviews/{tab_id}", "Delete a saved review"),
-        ],
-    },
-]
-
-
 def is_valid_python_code(text):
     try:
         ast.parse(text)
@@ -191,16 +147,6 @@ def review_code(code, tab_id):
         st.error(f"Error during code review: {str(e)}")
 
 
-def check_service_health(base_url):
-    try:
-        response = requests.get(f"{base_url}/health", timeout=3)
-        if response.status_code == 200:
-            return True, response.json()
-        return False, {"status_code": response.status_code, "body": response.text}
-    except requests.RequestException as e:
-        return False, {"error": str(e)}
-
-
 def get_sorted_tabs():
     return dict(
         sorted(
@@ -236,56 +182,48 @@ def logout_user():
     st.session_state["page"] = "Login/Register"
 
 
-def show_top_navigation():
-    st.title("Code Raptor")
-    nav_col1, nav_col2, nav_col3, nav_col4, nav_col5 = st.columns([2, 2, 2, 3, 1])
+def show_sidebar():
+    with st.sidebar:
+        st.title("Code Raptor")
+        st.caption(f"Logged in as {st.session_state['username']}")
 
-    with nav_col1:
-        if st.button("Code Review", use_container_width=True):
+        if st.button("Code Review", type="primary", use_container_width=True):
             st.session_state["page"] = "Review"
             st.rerun()
-    with nav_col2:
-        if st.button("Microservices", use_container_width=True):
-            st.session_state["page"] = "Microservices"
-            st.rerun()
-    with nav_col3:
         if st.button("About", use_container_width=True):
             st.session_state["page"] = "About"
             st.rerun()
-    with nav_col4:
-        st.write(f"Logged in as **{st.session_state['username']}**")
-    with nav_col5:
         if st.button("Logout", use_container_width=True):
             logout_user()
             st.rerun()
 
-    st.divider()
+        st.divider()
+        st.subheader("Review History")
 
-
-def show_review_history_bar():
-    st.subheader("Review History")
-    col1, col2 = st.columns([1, 4])
-
-    with col1:
-        if st.button("New Review", type="primary", use_container_width=True):
+        if st.button("New Review", use_container_width=True):
             create_new_tab()
+            st.session_state["page"] = "Review"
             st.rerun()
 
-    with col2:
-        sorted_tabs = get_sorted_tabs()
-        if not sorted_tabs:
+        if not get_sorted_tabs():
             st.caption("No saved reviews yet.")
             return
 
-        labels = {
-            f"Review from {tab_data['timestamp']}": tab_id
-            for tab_id, tab_data in sorted_tabs.items()
-        }
-        selected_label = st.selectbox("Open previous review", list(labels.keys()), label_visibility="collapsed")
-        selected_tab = labels[selected_label]
-        if selected_tab != st.session_state.get("current_tab"):
-            st.session_state["current_tab"] = selected_tab
-            st.rerun()
+        for tab_id, tab_data in get_sorted_tabs().items():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                if st.button(
+                    f"Review from {tab_data['timestamp']}",
+                    key=f"history_{tab_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state["current_tab"] = tab_id
+                    st.session_state["page"] = "Review"
+                    st.rerun()
+            with col2:
+                if st.button("X", key=f"delete_{tab_id}"):
+                    delete_tab(tab_id)
+                    st.rerun()
 
 
 def show_about_page():
@@ -316,53 +254,6 @@ def show_about_page():
         - Review service: history storage.
         """
     )
-
-
-def show_microservices_page():
-    st.title("Microservices")
-    st.write("Each backend service runs as a separate container and exposes endpoint paths over HTTP.")
-
-    overview_rows = [
-        {
-            "Service": service["name"],
-            "Base URL": service["base_url"],
-            "Health": f'{service["base_url"]}/health',
-            "Docs": f'{service["base_url"]}/docs',
-        }
-        for service in MICROSERVICES
-    ]
-    st.dataframe(overview_rows, use_container_width=True, hide_index=True)
-
-    tabs = st.tabs([service["name"] for service in MICROSERVICES])
-    for tab, service in zip(tabs, MICROSERVICES):
-        with tab:
-            st.subheader(service["name"])
-            st.write(service["purpose"])
-            st.code(service["base_url"], language="text")
-
-            if st.button("Check Service", key=f"health_{service['name']}"):
-                is_healthy, payload = check_service_health(service["base_url"])
-                if is_healthy:
-                    st.success("Service is reachable.")
-                else:
-                    st.error("Service is not reachable.")
-                st.json(payload)
-
-            st.markdown("#### Endpoint Paths")
-            endpoint_rows = [
-                {"Method": method, "Path": path, "Use": description}
-                for method, path, description in service["endpoints"]
-            ]
-            st.dataframe(endpoint_rows, use_container_width=True, hide_index=True)
-
-            st.markdown("#### FastAPI Routes")
-            st.code(
-                "\n".join(
-                    f"{method:6} {service['base_url']}{path}"
-                    for method, path, _ in service["endpoints"]
-                ),
-                language="text",
-            )
 
 
 def show_auth_page():
@@ -464,7 +355,6 @@ def show_review_page():
     current_tab, current_tab_data = get_current_tab_data()
 
     st.title("Code Review")
-    show_review_history_bar()
 
     code = st_ace(
         language="python",
@@ -523,11 +413,9 @@ if not st.session_state.get("username"):
     st.session_state["page"] = "Login/Register"
     show_auth_page()
 else:
-    show_top_navigation()
+    show_sidebar()
 
     if st.session_state["page"] == "About":
         show_about_page()
-    elif st.session_state["page"] == "Microservices":
-        show_microservices_page()
     else:
         show_review_page()
