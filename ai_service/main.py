@@ -8,10 +8,8 @@ import io
 app = FastAPI(title="AI Service")
 
 key = (os.getenv("GEMINI_API_KEY") or "").strip().strip("\"'")
-if not key:
-    raise RuntimeError("Gemini API key not found. Please set GEMINI_API_KEY.")
-
-genai.configure(api_key=key)
+if key:
+    genai.configure(api_key=key)
 
 system_prompt = """You are a code reviewer specializing in Python. Your task is to:
 - Analyze submitted code.
@@ -71,6 +69,9 @@ class ReviewResponse(BaseModel):
 
 @app.post("/review", response_model=ReviewResponse)
 def review_code(request: ReviewRequest):
+    if not key:
+        raise HTTPException(status_code=500, detail="Gemini API key not found. Please set GEMINI_API_KEY.")
+
     try:
         prompt = f"Review this code and provide fixes:\n{request.code}"
         response = model.generate_content(prompt)
@@ -89,6 +90,9 @@ def review_code(request: ReviewRequest):
 
 @app.post("/extract")
 async def extract_code(file: UploadFile = File(...)):
+    if not key:
+        raise HTTPException(status_code=500, detail="Gemini API key not found. Please set GEMINI_API_KEY.")
+
     try:
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes))
