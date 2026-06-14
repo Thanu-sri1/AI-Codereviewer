@@ -4,6 +4,8 @@ services:
     restart: unless-stopped
     expose:
       - "8001"
+    ports:
+      - "8001:8001"
     volumes:
       - ./auth_service:/app
 
@@ -12,6 +14,8 @@ services:
     restart: unless-stopped
     expose:
       - "8002"
+    ports:
+      - "8002:8002"
     volumes:
       - ./execution_service:/app
 
@@ -20,6 +24,8 @@ services:
     restart: unless-stopped
     expose:
       - "8003"
+    ports:
+      - "8003:8003"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
@@ -30,6 +36,8 @@ services:
     restart: unless-stopped
     expose:
       - "8004"
+    ports:
+      - "8004:8004"
     volumes:
       - ./review_service:/app
 
